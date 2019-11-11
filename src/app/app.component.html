@@ -16,7 +16,7 @@
                         class="btn btn-default"
                         type="button"
                         ngxClipboard
-                        [cbContent]="text1"
+                        [cbTextContent]="text1"
                         (cbOnSuccess)="isCopied1 = true"
                         (cbOnError)="onCopyFailure()"
                         [class.btn-success]="isCopied1"
@@ -44,10 +44,58 @@
                     <button
                         class="btn btn-default"
                         type="button"
-                        [ngxClipboard]="inputTarget"
+                        ngxClipboard
+                        [targetTextElement]="inputTarget"
                         (cbOnSuccess)="isCopied2 = true"
                         (cbOnError)="onCopyFailure()"
                         [class.btn-success]="isCopied2"
+                    >
+                        copy
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-10">
+            <h3>Copy from HTML -- text</h3>
+            Click this button, it will copy the HTML text from the input by referring to the
+            <strong>text content</strong><br />
+            <em><strong>NOTE:</strong> For the purpose of demo the textarea is read-only</em>
+            <div class="input-group">
+                <textarea readonly class="form-control" [(ngModel)]="html1"></textarea>
+                <span class="input-group-append">
+                    <button
+                        class="btn btn-default"
+                        type="button"
+                        ngxClipboard
+                        [cbHTMLContent]="html1"
+                        (cbOnSuccess)="isCopied3 = true"
+                        (cbOnError)="onCopyFailure()"
+                        [class.btn-success]="isCopied3"
+                    >
+                        copy
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-10">
+            <h3>Copy from HTML -- target</h3>
+            Click this button, it will copy the text from the input by referring to the
+            <strong>input element</strong>
+            <div class="input-group">
+                <div class="form-control" #htmlTarget [innerHTML]="html2"></div>
+                <span class="input-group-append">
+                    <button
+                        class="btn btn-default"
+                        type="button"
+                        ngxClipboard
+                        [targetHTMLElement]="htmlTarget"
+                        (cbOnSuccess)="isCopied4 = true"
+                        (cbOnError)="onCopyFailure()"
+                        [class.btn-success]="isCopied4"
                     >
                         copy
                     </button>
@@ -79,11 +127,10 @@
                             class="btn btn-default"
                             type="button"
                             ngxClipboard
-                            [cbContent]="textModal"
-                            [container]="modal"
-                            (cbOnSuccess)="isCopied3 = true"
+                            [cbTextContent]="textModal"
+                            (cbOnSuccess)="isCopied5 = true"
                             (cbOnError)="onCopyFailure()"
-                            [class.btn-success]="isCopied3"
+                            [class.btn-success]="isCopied5"
                         >
                             copy
                         </button>

@@ -7,7 +7,8 @@ import { ClarityModule } from '@clr/angular';
 
 import { AppComponent } from './app.component';
 
-import { ClipboardModule } from 'ngx-clipboard';
+// import { ClipboardModule } from 'ngx-clipboard';
+import { ClipboardModule } from 'projects/ngx-clipboard/src/public_api';
 @NgModule({
     declarations: [AppComponent],
     imports: [BrowserModule, BrowserAnimationsModule, FormsModule, ClipboardModule, ClarityModule],

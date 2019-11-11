@@ -3,136 +3,161 @@ import { Inject, Injectable, Optional } from '@angular/core';
 import { WINDOW } from 'ngx-window-token';
 import { Observable, Subject } from 'rxjs';
 
-import { ClipboardParams, IClipboardResponse } from './interface';
-
-// The following code is heavily copy from https://github.com/zenorocha/clipboard.js
+import { IClipboardResponse, CopySources } from './interface';
 
 @Injectable({ providedIn: 'root' })
 export class ClipboardService {
-    private tempTextArea: HTMLTextAreaElement | undefined;
-    private config: ClipboardParams = {};
+    private textContent: string | undefined;
+    private htmlContent: string | undefined;
 
     private copySubject = new Subject<IClipboardResponse>();
     public copyResponse$: Observable<IClipboardResponse> = this.copySubject.asObservable();
 
     constructor(@Inject(DOCUMENT) public document: any, @Optional() @Inject(WINDOW) private window: any) {}
 
-    public configure(config: ClipboardParams) {
-        this.config = config;
+    private resetServiceContents(): void {
+        this.textContent = undefined;
+        this.htmlContent = undefined;
+    }
+
+    private setTextContentFromString(content: string): void {
+        this.textContent = content;
+    }
+
+    private setHTMLContentFromString(content: string): void {
+        this.htmlContent = content;
+    }
+
+    private setTextContentFromElement(element: HTMLElement): void {
+        this.textContent = element instanceof HTMLInputElement ? element.value : element.innerText;
+    }
+
+    private setHTMLContentFromElement(element: HTMLElement): void {
+        this.htmlContent = element.outerHTML;
     }
 
     public get isSupported(): boolean {
         return !!this.document.queryCommandSupported && !!this.document.queryCommandSupported('copy') && !!this.window;
     }
 
-    public isTargetValid(element: HTMLInputElement | HTMLTextAreaElement): boolean {
-        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-            if (element.hasAttribute('disabled')) {
-                throw new Error('Invalid "target" attribute. Please use "readonly" instead of "disabled" attribute');
+    private copyContent(): boolean {
+        const customCopyHandler = function(event: ClipboardEvent): boolean {
+            try {
+                if (this.textContent) {
+                    event.clipboardData.setData('text/plain', this.textContent);
+                }
+                if (this.htmlContent) {
+                    event.clipboardData.setData('text/html', this.htmlContent);
+                }
+
+                event.preventDefault();
+            } catch (error) {
+                return false;
             }
+
             return true;
-        }
-        throw new Error('Target should be input or textarea');
+        };
+
+        const boundCustomCopyHandler = customCopyHandler.bind(this);
+        this.document.addEventListener('copy', boundCustomCopyHandler);
+        const success = this.document.execCommand('copy');
+        this.document.removeEventListener('copy', boundCustomCopyHandler);
+        return success;
     }
 
-    /**
-     * copyFromInputElement
-     */
-    public copyFromInputElement(targetElm: HTMLInputElement | HTMLTextAreaElement): boolean {
+    public copyFromContent(textContent: string, htmlContent?: string): boolean {
         try {
-            this.selectTarget(targetElm);
-            const re = this.copyText();
-            this.clearSelection(targetElm, this.window);
-            return re && this.isCopySuccessInIE11();
+            return this.copyFromSource({
+                source: textContent,
+                htmlSource: htmlContent
+            });
         } catch (error) {
             return false;
         }
     }
 
-    // this is for IE11 return true even if copy fail
-    isCopySuccessInIE11() {
-        const clipboardData = this.window['clipboardData'];
-        if (clipboardData && clipboardData.getData) {
-            if (!clipboardData.getData('Text')) {
-                return false;
-            }
+    public copyFromCommonContent(content: string): boolean {
+        try {
+            return this.copyFromSource({
+                source: content,
+                useAsCommonSource: true
+            });
+        } catch (error) {
+            return false;
         }
-        return true;
     }
 
-    /**
-     * Creates a fake textarea element, sets its value from `text` property,
-     * and makes a selection on it.
-     */
-    public copyFromContent(content: string, container: HTMLElement = this.window.document.body) {
-        // check if the temp textarea still belongs to the current container.
-        // In case we have multiple places using ngx-clipboard, one is in a modal using container but the other one is not.
-        if (this.tempTextArea && !container.contains(this.tempTextArea)) {
-            this.destroy(this.tempTextArea.parentElement);
+    public copyFromElement(textElement: HTMLElement, htmlElement?: HTMLElement): boolean {
+        try {
+            return this.copyFromSource({
+                source: textElement,
+                htmlSource: htmlElement
+            });
+        } catch (error) {
+            return false;
         }
+    }
 
-        if (!this.tempTextArea) {
-            this.tempTextArea = this.createTempTextArea(this.document, this.window);
+    public copyFromCommonElement(element: HTMLElement): boolean {
+        try {
+            return this.copyFromSource({
+                source: element,
+                useAsCommonSource: true
+            });
+        } catch (error) {
+            return false;
+        }
+    }
+
+    extractTextFromHTMLString(htmlString: string): string {
+        const tempElement: HTMLDivElement = <HTMLDivElement>this.document.createElement('div');
+        tempElement.innerHTML = htmlString;
+
+        return tempElement.innerText;
+    }
+
+    public copyFromSource(src: CopySources): boolean {
+        if (src.useAsCommonSource === true) {
             try {
-                container.appendChild(this.tempTextArea);
+                if (typeof src.source === 'string') {
+                    this.setHTMLContentFromString(src.source);
+                    this.setTextContentFromString(this.extractTextFromHTMLString(src.source));
+                } else {
+                    this.setHTMLContentFromElement(src.source);
+                    this.setTextContentFromElement(src.source);
+                }
             } catch (error) {
-                throw new Error('Container should be a Dom element');
+                throw new Error('source should be either string or HTMLElement');
+            }
+        } else {
+            if (src.source) {
+                try {
+                    if (typeof src.source === 'string') {
+                        this.setTextContentFromString(src.source);
+                    } else {
+                        this.setTextContentFromElement(src.source);
+                    }
+                } catch (error) {
+                    throw new Error('source should be either string or HTMLElement');
+                }
+            }
+
+            if (src.htmlSource) {
+                try {
+                    if (typeof src.htmlSource === 'string') {
+                        this.setHTMLContentFromString(src.htmlSource);
+                    } else {
+                        this.setHTMLContentFromElement(src.htmlSource);
+                    }
+                } catch (error) {
+                    throw new Error('htmlSource should be either string or HTMLElement');
+                }
             }
         }
-        this.tempTextArea.value = content;
 
-        const toReturn = this.copyFromInputElement(this.tempTextArea);
-        if (this.config.cleanUpAfterCopy) {
-            this.destroy(this.tempTextArea.parentElement);
-        }
-        return toReturn;
-    }
-
-    // remove temporary textarea if any
-    public destroy(container: HTMLElement = this.window.document.body) {
-        if (this.tempTextArea) {
-            container.removeChild(this.tempTextArea);
-            // removeChild doesn't remove the reference from memory
-            this.tempTextArea = undefined;
-        }
-    }
-
-    // select the target html input element
-    private selectTarget(inputElement: HTMLInputElement | HTMLTextAreaElement): number | undefined {
-        inputElement.select();
-        inputElement.setSelectionRange(0, inputElement.value.length);
-        return inputElement.value.length;
-    }
-
-    private copyText(): boolean {
-        return this.document.execCommand('copy');
-    }
-    // Moves focus away from `target` and back to the trigger, removes current selection.
-    private clearSelection(inputElement: HTMLInputElement | HTMLTextAreaElement, window: Window) {
-        // tslint:disable-next-line:no-unused-expression
-        inputElement && inputElement.focus();
-        window.getSelection().removeAllRanges();
-    }
-
-    // create a fake textarea for copy command
-    private createTempTextArea(doc: Document, window: Window): HTMLTextAreaElement {
-        const isRTL = doc.documentElement.getAttribute('dir') === 'rtl';
-        let ta: HTMLTextAreaElement;
-        ta = doc.createElement('textarea');
-        // Prevent zooming on iOS
-        ta.style.fontSize = '12pt';
-        // Reset box model
-        ta.style.border = '0';
-        ta.style.padding = '0';
-        ta.style.margin = '0';
-        // Move element out of screen horizontally
-        ta.style.position = 'absolute';
-        ta.style[isRTL ? 'right' : 'left'] = '-9999px';
-        // Move element to the same position vertically
-        const yPosition = window.pageYOffset || doc.documentElement.scrollTop;
-        ta.style.top = yPosition + 'px';
-        ta.setAttribute('readonly', '');
-        return ta;
+        const success = this.copyContent();
+        this.resetServiceContents();
+        return success;
     }
 
     /**
