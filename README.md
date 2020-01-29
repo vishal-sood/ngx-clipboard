@@ -61,21 +61,39 @@ System.config({
 
 This library support multiple kinds of copy source.
 
--   Setting `cbContent` attribute
+-   Setting `cbTextContent` attribute
 
 ```html
-<button ngxClipboard [cbContent]="'target string'">Copy</button>
+<button ngxClipboard [cbTextContent]="'target string'">Copy</button>
 ```
 
-You can assign the parent **container** to avoid focus trapper issue, #145
+-   Setting `cbHTMLContent` attribute
 
 ```html
-<div #container>
-    <button ngxClipboard [cbContent]="'target string'" [container]="container">Copy</button>
-</div>
+<button ngxClipboard [cbHTMLContent]="'<p>target HTML</p>'">Copy</button>
 ```
 
--   Setting an input target
+-   Setting an input text target (text from the HTML Element will be copied)
+
+```html
+....
+
+<input type="text" #inputTarget />
+
+<button ngxClipboard [targetTextElement]="inputTarget">Copy</button>
+```
+
+-   Setting an input HTML target (the HTML Element's HTML as string code will be copied)
+
+```html
+....
+
+<input type="text" #inputTarget />
+
+<button ngxClipboard [targetHTMLElement]="inputTarget">Copy</button>
+```
+
+-   Setting a common target for both HTML and text
 
 ```html
 ....
@@ -85,7 +103,11 @@ You can assign the parent **container** to avoid focus trapper issue, #145
 <button [ngxClipboard]="inputTarget">Copy</button>
 ```
 
--   Using `copyFromContent` from `ClipboardService` to copy any text you dynamically created.
+### Using methods from `ClipboardService` directly
+
+Using methods from the service you can copy text and/or HTML content that yuo dynamically created
+
+-   Using `copyFromContent` from `ClipboardService` to copy any text and HTML content.
 
 ```ts
 import { ClipboardService } from 'ngx-clipboard'
@@ -96,10 +118,28 @@ constructor(private _clipboardService: ClipboardService){
 ...
 }
 
-copy(text: string){
-  this._clipboardService.copyFromContent(text)
+copy(text: string, html: string){
+  this._clipboardService.copyFromContent(text, html)
 }
 ```
+
+-   Using `copyFromCommonContent` from `ClipboardService` to copy both text and HTML content from the same source.
+
+```ts
+import { ClipboardService } from 'ngx-clipboard'
+
+...
+
+constructor(private _clipboardService: ClipboardService){
+...
+}
+
+copy(){
+  this._clipboardService.copyFromContent('<p>copy target</p>')
+}
+```
+
+In the above example the text content copied will be **_"copy target"_** , whereas the html content will be **_"\<p>copy target\</p>"_**
 
 ### Callbacks
 
@@ -133,22 +173,19 @@ _Special thanks to @surajpoddar16 for implementing this feature_
 
 To handle copy response globally, you can subscribe to `copyResponse$` exposed by the `ClipboardService`
 
-```
+```ts
 export class ClipboardResponseService {
-  constructor(
-    private _clipboardService: ClipboardService,
-    private _toasterService: ToasterService
-  ) {
-    this.handleClipboardResponse();
-  }
+    constructor(private _clipboardService: ClipboardService, private _toasterService: ToasterService) {
+        this.handleClipboardResponse();
+    }
 
-  handleClipboardResponse() {
-    this._clipboardService.copyObservable$.subscribe((res: IClipboardResponse) => {
-      if (res.isSuccess) {
-        this._toasterService.pop('success', undefined, res.successMessage);
-      }
-    });
-  }
+    handleClipboardResponse() {
+        this._clipboardService.copyObservable$.subscribe((res: IClipboardResponse) => {
+            if (res.isSuccess) {
+                this._toasterService.pop('success', undefined, res.successMessage);
+            }
+        });
+    }
 }
 ```
 
