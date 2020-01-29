@@ -5,20 +5,31 @@ import { Observable, Subject } from 'rxjs';
 
 import { ClipboardParams, IClipboardResponse } from './interface';
 
-// The following code is heavily copy from https://github.com/zenorocha/clipboard.js
-
+/**
+ * The following code is heavily copied from https://github.com/zenorocha/clipboard.js
+ */
 @Injectable({ providedIn: 'root' })
 export class ClipboardService {
-    private tempTextArea: HTMLTextAreaElement | undefined;
-    private config: ClipboardParams = {};
-
     private copySubject = new Subject<IClipboardResponse>();
     public copyResponse$: Observable<IClipboardResponse> = this.copySubject.asObservable();
+    private tempTextArea: HTMLTextAreaElement | undefined;
+    private config: ClipboardParams = {};
 
     constructor(@Inject(DOCUMENT) public document: any, @Optional() @Inject(WINDOW) private window: any) {}
 
     public configure(config: ClipboardParams) {
         this.config = config;
+    }
+
+    public copy(content: string): void {
+        if (!this.isSupported || !content) {
+            return this.pushCopyResponse({ isSuccess: false, content });
+        }
+        const copyResult = this.copyFromContent(content);
+        if (copyResult) {
+            return this.pushCopyResponse({ content, isSuccess: copyResult });
+        }
+        return this.pushCopyResponse({ isSuccess: false, content });
     }
 
     public get isSupported(): boolean {
@@ -36,21 +47,23 @@ export class ClipboardService {
     }
 
     /**
-     * copyFromInputElement
+     * Attempts to copy from an input `targetElm`
      */
-    public copyFromInputElement(targetElm: HTMLInputElement | HTMLTextAreaElement): boolean {
+    public copyFromInputElement(targetElm: HTMLInputElement | HTMLTextAreaElement, isFocus = true): boolean {
         try {
             this.selectTarget(targetElm);
             const re = this.copyText();
-            this.clearSelection(targetElm, this.window);
+            this.clearSelection(isFocus ? targetElm : undefined, this.window);
             return re && this.isCopySuccessInIE11();
         } catch (error) {
             return false;
         }
     }
 
-    // this is for IE11 return true even if copy fail
-    isCopySuccessInIE11() {
+    /**
+     * This is a hack for IE11 to return `true` even if copy fails.
+     */
+    public isCopySuccessInIE11(): boolean {
         const clipboardData = this.window['clipboardData'];
         if (clipboardData && clipboardData.getData) {
             if (!clipboardData.getData('Text')) {
@@ -64,7 +77,7 @@ export class ClipboardService {
      * Creates a fake textarea element, sets its value from `text` property,
      * and makes a selection on it.
      */
-    public copyFromContent(content: string, container: HTMLElement = this.document.body) {
+    public copyFromContent(content: string, container: HTMLElement = this.document.body): boolean {
         // check if the temp textarea still belongs to the current container.
         // In case we have multiple places using ngx-clipboard, one is in a modal using container but the other one is not.
         if (this.tempTextArea && !container.contains(this.tempTextArea)) {
@@ -81,15 +94,17 @@ export class ClipboardService {
         }
         this.tempTextArea.value = content;
 
-        const toReturn = this.copyFromInputElement(this.tempTextArea);
+        const toReturn = this.copyFromInputElement(this.tempTextArea, false);
         if (this.config.cleanUpAfterCopy) {
             this.destroy(this.tempTextArea.parentElement);
         }
         return toReturn;
     }
 
-    // remove temporary textarea if any
-    public destroy(container: HTMLElement = this.document.body) {
+    /**
+     * Remove temporary textarea if any exists.
+     */
+    public destroy(container: HTMLElement = this.document.body): void {
         if (this.tempTextArea) {
             container.removeChild(this.tempTextArea);
             // removeChild doesn't remove the reference from memory
@@ -97,7 +112,9 @@ export class ClipboardService {
         }
     }
 
-    // select the target html input element
+    /**
+     * Select the target html input element.
+     */
     private selectTarget(inputElement: HTMLInputElement | HTMLTextAreaElement): number | undefined {
         inputElement.select();
         inputElement.setSelectionRange(0, inputElement.value.length);
@@ -107,14 +124,18 @@ export class ClipboardService {
     private copyText(): boolean {
         return this.document.execCommand('copy');
     }
-    // Moves focus away from `target` and back to the trigger, removes current selection.
-    private clearSelection(inputElement: HTMLInputElement | HTMLTextAreaElement, window: Window) {
-        // tslint:disable-next-line:no-unused-expression
+
+    /**
+     * Moves focus away from `target` and back to the trigger, removes current selection.
+     */
+    private clearSelection(inputElement: HTMLInputElement | HTMLTextAreaElement, window: Window): void {
         inputElement && inputElement.focus();
         window.getSelection().removeAllRanges();
     }
 
-    // create a fake textarea for copy command
+    /**
+     * Creates a fake textarea for copy command.
+     */
     private createTempTextArea(doc: Document, window: Window): HTMLTextAreaElement {
         const isRTL = doc.documentElement.getAttribute('dir') === 'rtl';
         let ta: HTMLTextAreaElement;
@@ -139,7 +160,14 @@ export class ClipboardService {
      * Pushes copy operation response to copySubject, to provide global access
      * to the response.
      */
-    public pushCopyReponse(response: IClipboardResponse) {
+    public pushCopyResponse(response: IClipboardResponse): void {
         this.copySubject.next(response);
+    }
+
+    /**
+     * @deprecated use pushCopyResponse instead.
+     */
+    public pushCopyReponse(response: IClipboardResponse): void {
+        this.pushCopyResponse(response);
     }
 }
